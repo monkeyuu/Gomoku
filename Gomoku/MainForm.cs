@@ -21,6 +21,8 @@ namespace Gomoku
         private const int BotH    = 128;
         private const int FormH   = TopH + BoardSz + BotH;               // 802
         private const int BoardX  = (FormW - BoardSz) / 2;               // 31
+        private const int CardW   = 158;
+        private const int CardH   = 58;
 
         // ── 遊戲物件 ────────────────────────────────────────────────
         private readonly GomokuGame _game = new GomokuGame();
@@ -29,16 +31,15 @@ namespace Gomoku
         private bool _aiThinking  = false;
         private int  _gameVersion = 0;
 
-        // ── 難度設定 ────────────────────────────────────────────────
+        // ── 難度顏色 / 名稱 ─────────────────────────────────────────
         private static readonly Color[] DiffColors =
         {
-            Color.FromArgb(46, 125, 50),   // 簡單  — 綠
-            Color.FromArgb(21, 101, 192),  // 中等  — 藍
-            Color.FromArgb(204, 101, 0),   // 困難  — 橘
-            Color.FromArgb(136, 14, 79)    // 大師  — 深紫紅
+            Color.FromArgb(46, 125, 50),
+            Color.FromArgb(21, 101, 192),
+            Color.FromArgb(204, 101,  0),
+            Color.FromArgb(136,  14, 79)
         };
-        private static readonly string[] DiffNames  = { "簡單", "中等", "困難", "大師" };
-        private static readonly string[] DiffLabels = { "●  簡單", "●  中等", "●  困難", "★  大師" };
+        private static readonly string[] DiffLabels = { "簡單", "中等", "困難", "大師" };
         private readonly Button[] _diffBtns = new Button[4];
 
         // ── UI 控制項 ────────────────────────────────────────────────
@@ -47,8 +48,7 @@ namespace Gomoku
         private Panel  _rightCard;
         private Label  _lblTimer;
         private Label  _lblStatus;
-        private Label  _lblMoves;
-        private Label  _lblWName;   // 右側玩家名稱（可切換「電腦」/「玩家 2」）
+        private Label  _lblWName;   // 右卡片名稱（「電腦」或「玩家 2」）
 
         // ── 計時器 / 懸停 ───────────────────────────────────────────
         private readonly System.Windows.Forms.Timer _clock;
@@ -73,7 +73,7 @@ namespace Gomoku
             KeyPreview      = true;
             Font            = new Font("Microsoft JhengHei UI", 9f);
 
-            // ── 頂部資訊列 ──────────────────────────────────────────
+            // 頂部資訊列
             Panel topPanel = new Panel();
             topPanel.Location  = Point.Empty;
             topPanel.Size      = new Size(FormW, TopH);
@@ -81,7 +81,7 @@ namespace Gomoku
             Controls.Add(topPanel);
             BuildTopPanel(topPanel);
 
-            // ── 棋盤（置中） ────────────────────────────────────────
+            // 棋盤（置中）
             _board = new DoubleBufferedPanel();
             _board.Location    = new Point(BoardX, TopH);
             _board.Size        = new Size(BoardSz, BoardSz);
@@ -92,7 +92,7 @@ namespace Gomoku
             _board.MouseLeave += (s, e) => { _hover = null; _board.Invalidate(); };
             Controls.Add(_board);
 
-            // ── 底部控制列 ─────────────────────────────────────────
+            // 底部控制列
             Panel botPanel = new Panel();
             botPanel.Location  = new Point(0, TopH + BoardSz);
             botPanel.Size      = new Size(FormW, BotH);
@@ -100,7 +100,7 @@ namespace Gomoku
             Controls.Add(botPanel);
             BuildBottomPanel(botPanel);
 
-            // ── 遊戲計時器 ─────────────────────────────────────────
+            // 遊戲計時器
             _clock = new System.Windows.Forms.Timer();
             _clock.Interval = 1000;
             _clock.Tick += (s, e) => { _elapsed++; RefreshTimer(); };
@@ -109,121 +109,178 @@ namespace Gomoku
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 頂部面板
+        // 頂部面板：先加中央 Label，再加卡片（卡片 z-order 在上）
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         private void BuildTopPanel(Panel top)
         {
-            const int cardW = 158, cardH = 58, cardY = 9;
+            const int cardY  = 9;
+            // 中央區域：左卡右緣=170，右卡左緣=490，中央寬=320
+            const int cX = 174, cW = 312;
 
-            // ── 左側：玩家（黑棋） ─────────────────────────────────
-            _leftCard = MakeCard(top, 12, cardY, cardW, cardH,
-                                 Color.FromArgb(36, 68, 110));   // 預設高亮（黑棋先行）
-
-            // 人物圖示
-            Label lIcon = new Label();
-            lIcon.Text      = "♟";
-            lIcon.Font      = new Font("Segoe UI Symbol", 20, FontStyle.Regular);
-            lIcon.ForeColor = Color.FromArgb(130, 190, 130);
-            lIcon.Location  = new Point(5, 4);
-            lIcon.Size      = new Size(38, 50);
-            lIcon.TextAlign = ContentAlignment.MiddleCenter;
-            lIcon.AutoSize  = false;
-            _leftCard.Controls.Add(lIcon);
-
-            Label lName = new Label();
-            lName.Text      = "玩家";
-            lName.Font      = new Font("Microsoft JhengHei", 11, FontStyle.Bold);
-            lName.ForeColor = Color.White;
-            lName.Location  = new Point(47, 6);
-            lName.Size      = new Size(104, 22);
-            lName.AutoSize  = false;
-            _leftCard.Controls.Add(lName);
-
-            // 黑棋 indicator
-            PictureBox pbB = MakePieceBox(_leftCard, 47, 29, Player.Black);
-            _leftCard.Controls.Add(pbB);
-
-            Label lBLabel = new Label();
-            lBLabel.Text      = "黑棋";
-            lBLabel.Font      = new Font("Microsoft JhengHei", 7.5f);
-            lBLabel.ForeColor = Color.FromArgb(180, 180, 200);
-            lBLabel.Location  = new Point(72, 33);
-            lBLabel.Size      = new Size(38, 18);
-            lBLabel.AutoSize  = false;
-            _leftCard.Controls.Add(lBLabel);
-
-            // ── 中央：計時 + 狀態 ─────────────────────────────────
-            // 計時器（大字）
+            // ── 先加中央 Label（z-order 較低）──────────────────────
             _lblTimer = new Label();
             _lblTimer.Text      = "00:00";
             _lblTimer.Font      = new Font("Consolas", 20, FontStyle.Bold);
             _lblTimer.ForeColor = Color.White;
-            _lblTimer.Location  = new Point(0, 10);
-            _lblTimer.Size      = new Size(FormW, 30);
+            _lblTimer.Location  = new Point(cX, 8);
+            _lblTimer.Size      = new Size(cW, 32);
             _lblTimer.TextAlign = ContentAlignment.MiddleCenter;
             _lblTimer.AutoSize  = false;
             top.Controls.Add(_lblTimer);
 
-            // 狀態文字
             _lblStatus = new Label();
             _lblStatus.Text      = "您的回合";
             _lblStatus.Font      = new Font("Microsoft JhengHei", 9f);
             _lblStatus.ForeColor = Color.FromArgb(120, 200, 120);
-            _lblStatus.Location  = new Point(0, 44);
-            _lblStatus.Size      = new Size(FormW, 22);
+            _lblStatus.Location  = new Point(cX, 43);
+            _lblStatus.Size      = new Size(cW, 22);
             _lblStatus.TextAlign = ContentAlignment.MiddleCenter;
             _lblStatus.AutoSize  = false;
             top.Controls.Add(_lblStatus);
 
-            // ── 右側：電腦（白棋） ─────────────────────────────────
-            _rightCard = MakeCard(top, FormW - 12 - cardW, cardY, cardW, cardH,
-                                  Color.FromArgb(44, 44, 58));  // 非高亮
+            // ── 再加卡片（z-order 在 Label 之上）─────────────────
+            // 左卡（黑棋）
+            _leftCard = MakeCard(top, 12, cardY, CardW, CardH,
+                                 Color.FromArgb(36, 68, 110));
 
-            // 機器人圖示
-            Label rIcon = new Label();
-            rIcon.Text      = "⚙";
-            rIcon.Font      = new Font("Segoe UI Symbol", 20, FontStyle.Regular);
-            rIcon.ForeColor = Color.FromArgb(120, 160, 220);
-            rIcon.Location  = new Point(cardW - 43, 4);
-            rIcon.Size      = new Size(38, 50);
-            rIcon.TextAlign = ContentAlignment.MiddleCenter;
-            rIcon.AutoSize  = false;
-            _rightCard.Controls.Add(rIcon);
+            // ♟ 圖示
+            Label lIcon = MakeLbl(_leftCard, "♟",
+                new Font("Segoe UI Symbol", 18), Color.FromArgb(130, 200, 130),
+                new Point(4, 3), new Size(32, 52));
 
+            // 玩家名稱
+            MakeLbl(_leftCard, "玩家",
+                new Font("Microsoft JhengHei", 11, FontStyle.Bold), Color.White,
+                new Point(40, 5), new Size(114, 22));
+
+            // 顏色標籤
+            MakeLbl(_leftCard, "黑棋",
+                new Font("Microsoft JhengHei", 7.5f), Color.FromArgb(180, 180, 210),
+                new Point(68, 33), new Size(40, 18));
+
+            // 棋子由 Paint 事件繪製，不用 PictureBox（避免透明背景問題）
+            _leftCard.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                DrawPieceSmall(e.Graphics, 51, 41, Player.Black, 11);
+            };
+
+            // 右卡（白棋）
+            _rightCard = MakeCard(top, FormW - 12 - CardW, cardY, CardW, CardH,
+                                  Color.FromArgb(44, 44, 58));
+
+            // ⚙ 圖示
+            MakeLbl(_rightCard, "⚙",
+                new Font("Segoe UI Symbol", 18), Color.FromArgb(120, 165, 225),
+                new Point(CardW - 38, 3), new Size(34, 52));
+
+            // 電腦名稱（可動態更新）
             _lblWName = new Label();
             _lblWName.Text      = "電腦";
             _lblWName.Font      = new Font("Microsoft JhengHei", 11, FontStyle.Bold);
             _lblWName.ForeColor = Color.White;
-            _lblWName.Location  = new Point(8, 6);
-            _lblWName.Size      = new Size(104, 22);
+            _lblWName.Location  = new Point(8, 5);
+            _lblWName.Size      = new Size(114, 22);
             _lblWName.AutoSize  = false;
             _rightCard.Controls.Add(_lblWName);
 
-            // 白棋 indicator
-            PictureBox pbW = MakePieceBox(_rightCard, 8, 29, Player.White);
-            _rightCard.Controls.Add(pbW);
+            // 顏色標籤
+            MakeLbl(_rightCard, "白棋",
+                new Font("Microsoft JhengHei", 7.5f), Color.FromArgb(180, 180, 210),
+                new Point(36, 33), new Size(40, 18));
 
-            Label lWLabel = new Label();
-            lWLabel.Text      = "白棋";
-            lWLabel.Font      = new Font("Microsoft JhengHei", 7.5f);
-            lWLabel.ForeColor = Color.FromArgb(180, 180, 200);
-            lWLabel.Location  = new Point(33, 33);
-            lWLabel.Size      = new Size(38, 18);
-            lWLabel.AutoSize  = false;
-            _rightCard.Controls.Add(lWLabel);
-
-            // 步數（右側小字，底部中央）
-            _lblMoves = new Label();
-            _lblMoves.Text      = "第 0 手";
-            _lblMoves.Font      = new Font("Microsoft JhengHei", 7.5f);
-            _lblMoves.ForeColor = Color.FromArgb(110, 110, 130);
-            _lblMoves.Location  = new Point(0, TopH - 14);
-            _lblMoves.Size      = new Size(FormW, 12);
-            _lblMoves.TextAlign = ContentAlignment.MiddleCenter;
-            _lblMoves.AutoSize  = false;
-            top.Controls.Add(_lblMoves);
+            // 白棋由 Paint 事件繪製
+            _rightCard.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                DrawPieceSmall(e.Graphics, 22, 41, Player.White, 11);
+            };
         }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 底部面板
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        private void BuildBottomPanel(Panel bot)
+        {
+            // ── 難度按鈕列 ─────────────────────────────────────────
+            // 文字改為「電腦難度：」（不出現 AI 字樣）
+            const int dBtnW = 100, dBtnH = 30, dGap = 5;
+            Label lblDiff = new Label();
+            lblDiff.Text      = "電腦難度：";
+            lblDiff.Font      = new Font("Microsoft JhengHei", 9f, FontStyle.Bold);
+            lblDiff.ForeColor = Color.FromArgb(170, 170, 185);
+            lblDiff.Size      = new Size(76, dBtnH);
+            lblDiff.TextAlign = ContentAlignment.MiddleRight;
+            lblDiff.AutoSize  = false;
+
+            int diffTotalW = lblDiff.Width + 8 + 4 * dBtnW + 3 * dGap;
+            int diffStartX = (FormW - diffTotalW) / 2;
+            lblDiff.Location = new Point(diffStartX, 15);
+            bot.Controls.Add(lblDiff);
+
+            for (int i = 0; i < 4; i++)
+            {
+                Button b = new Button();
+                b.Text      = DiffLabels[i];
+                b.Font      = new Font("Microsoft JhengHei", 9f, FontStyle.Bold);
+                b.ForeColor = Color.White;
+                b.FlatStyle = FlatStyle.Flat;
+                b.Location  = new Point(diffStartX + lblDiff.Width + 8 + i * (dBtnW + dGap), 15);
+                b.Size      = new Size(dBtnW, dBtnH);
+                b.Cursor    = Cursors.Hand;
+                b.FlatAppearance.BorderSize = 1;
+                b.Tag    = i;
+                b.Click += DiffBtn_Click;
+                bot.Controls.Add(b);
+                _diffBtns[i] = b;
+            }
+            UpdateDiffBtns();
+
+            // ── 操作按鈕列（移除會出現方框的 emoji）─────────────────
+            const int aBtnW = 178, aBtnH = 36, aGap = 12;
+            int actStartX = (FormW - 3 * aBtnW - 2 * aGap) / 2;
+            const int aBtnY = 60;
+
+            // 使用 BMP Unicode 箭頭，不用 emoji（避免方框問題）
+            Button btnNew = MakeActBtn(bot, "↺  新遊戲  (N)",
+                Color.FromArgb(22, 128, 52), actStartX, aBtnY, aBtnW, aBtnH);
+            btnNew.Click += (s, e) => NewGame();
+
+            Button btnUndo = MakeActBtn(bot, "↩  悔棋      (U)",
+                Color.FromArgb(128, 88, 18), actStartX + aBtnW + aGap, aBtnY, aBtnW, aBtnH);
+            btnUndo.Click += (s, e) => UndoMove();
+
+            Button btnMode = MakeActBtn(bot, "⇄  切換對戰模式",
+                Color.FromArgb(64, 64, 155), actStartX + 2 * (aBtnW + aGap), aBtnY, aBtnW, aBtnH);
+            btnMode.Click += (s, e) => ToggleMode();
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 關閉確認
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                DialogResult res = MessageBox.Show(
+                    "確定要關閉遊戲嗎？",
+                    "關閉遊戲",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2);   // 預設選「否」
+
+                if (res == DialogResult.No)
+                    e.Cancel = true;
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // Helper 工廠
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         private static Panel MakeCard(Control parent, int x, int y, int w, int h, Color bg)
         {
@@ -235,79 +292,19 @@ namespace Gomoku
             return p;
         }
 
-        private static PictureBox MakePieceBox(Control parent, int x, int y, Player player)
+        private static Label MakeLbl(Control parent, string text, Font font, Color color,
+                                     Point loc, Size sz)
         {
-            PictureBox pb = new PictureBox();
-            pb.Location  = new Point(x, y);
-            pb.Size      = new Size(24, 24);
-            pb.BackColor = Color.Transparent;
-
-            Player captured = player;           // capture for closure
-            pb.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                DrawPieceSmall(e.Graphics, 12, 12, captured, 10);
-            };
-            return pb;
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 底部面板
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        private void BuildBottomPanel(Panel bot)
-        {
-            // ── 難度列 ─────────────────────────────────────────────
-            Label lblDiff = new Label();
-            lblDiff.Text      = "AI 難度：";
-            lblDiff.Font      = new Font("Microsoft JhengHei", 9f, FontStyle.Bold);
-            lblDiff.ForeColor = Color.FromArgb(170, 170, 185);
-            lblDiff.Size      = new Size(70, 30);
-            lblDiff.TextAlign = ContentAlignment.MiddleRight;
-            lblDiff.AutoSize  = false;
-
-            // 計算難度按鈕總寬度，水平置中
-            const int dBtnW = 100, dBtnH = 30, dGap = 5;
-            int diffTotalW = 70 + 8 + 4 * dBtnW + 3 * dGap;
-            int diffStartX = (FormW - diffTotalW) / 2;
-
-            lblDiff.Location = new Point(diffStartX, 14);
-            bot.Controls.Add(lblDiff);
-
-            for (int i = 0; i < 4; i++)
-            {
-                Button b = new Button();
-                b.Text      = DiffLabels[i];
-                b.Font      = new Font("Microsoft JhengHei", 9f, FontStyle.Bold);
-                b.ForeColor = Color.White;
-                b.FlatStyle = FlatStyle.Flat;
-                b.Location  = new Point(diffStartX + 78 + i * (dBtnW + dGap), 14);
-                b.Size      = new Size(dBtnW, dBtnH);
-                b.Cursor    = Cursors.Hand;
-                b.FlatAppearance.BorderSize = 1;
-                b.Tag    = i;
-                b.Click += DiffBtn_Click;
-                bot.Controls.Add(b);
-                _diffBtns[i] = b;
-            }
-            UpdateDiffBtns();
-
-            // ── 操作按鈕列 ─────────────────────────────────────────
-            const int aBtnW = 178, aBtnH = 36, aGap = 12;
-            int actStartX = (FormW - 3 * aBtnW - 2 * aGap) / 2;
-            const int aBtnY = 58;
-
-            Button btnNew = MakeActBtn(bot, "🔄  新遊戲  (N)",
-                Color.FromArgb(22, 128, 52), actStartX, aBtnY, aBtnW, aBtnH);
-            btnNew.Click += (s, e) => NewGame();
-
-            Button btnUndo = MakeActBtn(bot, "↩  悔棋      (U)",
-                Color.FromArgb(128, 88, 18), actStartX + aBtnW + aGap, aBtnY, aBtnW, aBtnH);
-            btnUndo.Click += (s, e) => UndoMove();
-
-            Button btnMode = MakeActBtn(bot, "🔀  切換對戰模式",
-                Color.FromArgb(64, 64, 155), actStartX + 2 * (aBtnW + aGap), aBtnY, aBtnW, aBtnH);
-            btnMode.Click += (s, e) => ToggleMode();
+            Label l = new Label();
+            l.Text      = text;
+            l.Font      = font;
+            l.ForeColor = color;
+            l.Location  = loc;
+            l.Size      = sz;
+            l.TextAlign = ContentAlignment.MiddleCenter;
+            l.AutoSize  = false;
+            parent.Controls.Add(l);
+            return l;
         }
 
         private static Button MakeActBtn(Control parent, string text, Color color,
@@ -337,16 +334,24 @@ namespace Gomoku
 
         private void UpdateDiffBtns()
         {
-            int selected = (int)_ai.Difficulty;
+            int sel = (int)_ai.Difficulty;
             for (int i = 0; i < 4; i++)
             {
                 if (_diffBtns[i] == null) continue;
-                bool on = (i == selected);
+                bool on = (i == sel);
                 _diffBtns[i].BackColor = on ? DiffColors[i] : Color.FromArgb(46, 46, 60);
                 _diffBtns[i].ForeColor = on ? Color.White   : Color.FromArgb(160, 160, 180);
                 _diffBtns[i].FlatAppearance.BorderColor =
                     on ? Lighten(DiffColors[i], 30) : Color.FromArgb(68, 68, 85);
             }
+        }
+
+        private static Color Lighten(Color c, int d)
+        {
+            return Color.FromArgb(
+                Math.Min(255, c.R + d),
+                Math.Min(255, c.G + d),
+                Math.Min(255, c.B + d));
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -380,7 +385,6 @@ namespace Gomoku
                 Color.FromArgb(216, 145, 62), Color.FromArgb(174, 108, 34), 40f))
                 g.FillRectangle(bg, rect);
 
-            // 木紋線
             Random rng = new Random(7);
             using (Pen grain = new Pen(Color.FromArgb(16, 0, 0, 0), 1.2f))
                 for (int i = 0; i < 28; i++)
@@ -468,7 +472,6 @@ namespace Gomoku
                     g.DrawEllipse(border, rc);
             }
 
-            // 光澤
             int sh = R - 4;
             if (sh > 0)
             {
@@ -482,13 +485,11 @@ namespace Gomoku
             }
 
             if (isLast)
-            {
                 using (SolidBrush mark = new SolidBrush(Color.FromArgb(230, 50, 50)))
                     g.FillEllipse(mark, cx - 4, cy - 4, 8, 8);
-            }
         }
 
-        /// <summary>在頂部面板的棋子指示器中使用（較小尺寸）</summary>
+        /// <summary>在頂部卡片 Paint 事件中繪製小棋子（直接在卡片 GDI 上畫，無透明背景問題）</summary>
         private static void DrawPieceSmall(Graphics g, int cx, int cy, Player player, int r)
         {
             Rectangle rc = new Rectangle(cx - r, cy - r, r * 2, r * 2);
@@ -542,28 +543,20 @@ namespace Gomoku
             if (cells == null || cells.Count < 2) return;
 
             cells.Sort((a, b) => a[1] != b[1] ? a[1].CompareTo(b[1]) : a[0].CompareTo(b[0]));
-            double x1 = Pad + cells[0][1] * Cell,              y1 = Pad + cells[0][0] * Cell;
+            double x1 = Pad + cells[0][1] * Cell,               y1 = Pad + cells[0][0] * Cell;
             double x2 = Pad + cells[cells.Count - 1][1] * Cell, y2 = Pad + cells[cells.Count - 1][0] * Cell;
 
             double dx = x2 - x1, dy = y2 - y1;
             double len = Math.Sqrt(dx * dx + dy * dy);
             if (len > 0)
-            {
-                const int ext = 14;
-                x1 -= dx / len * ext; y1 -= dy / len * ext;
-                x2 += dx / len * ext; y2 += dy / len * ext;
-            }
+            { const int ext = 14; x1 -= dx / len * ext; y1 -= dy / len * ext; x2 += dx / len * ext; y2 += dy / len * ext; }
 
             using (Pen pen = new Pen(Color.FromArgb(215, 255, 55, 55), 4.5f))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap   = LineCap.Round;
-                g.DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y2);
-            }
+            { pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; g.DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y2); }
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 輸入處理
+        // 輸入
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         private void Board_MouseMove(object sender, MouseEventArgs e)
@@ -614,13 +607,12 @@ namespace Gomoku
             _aiThinking = true;
             RefreshStatus();
 
-            // AI「思考」延遲（根據難度調整）
             int thinkMs;
             switch (_ai.Difficulty)
             {
                 case Difficulty.Easy:   thinkMs = 200; break;
                 case Difficulty.Hard:   thinkMs = 400; break;
-                case Difficulty.Master: thinkMs = 100; break;  // minimax 本身已耗時
+                case Difficulty.Master: thinkMs = 100; break;
                 default:                thinkMs = 300; break;
             }
             await Task.Delay(thinkMs);
@@ -666,7 +658,7 @@ namespace Gomoku
 
         private void ToggleMode()
         {
-            _aiMode       = !_aiMode;
+            _aiMode        = !_aiMode;
             _lblWName.Text = _aiMode ? "電腦" : "玩家 2";
             NewGame();
         }
@@ -679,12 +671,9 @@ namespace Gomoku
             SoundManager.PlayWin();
 
             string msg;
-            if (_game.Winner == Player.None)
-                msg = "棋盤已滿，平局！";
-            else if (_game.Winner == Player.Black)
-                msg = _aiMode ? "🎉 恭喜您獲勝！" : "⚫ 黑棋獲勝！";
-            else
-                msg = _aiMode ? "💻 AI 獲勝！再接再厲！" : "⚪ 白棋獲勝！";
+            if (_game.Winner == Player.None)         msg = "棋盤已滿，平局！";
+            else if (_game.Winner == Player.Black)   msg = _aiMode ? "🎉 恭喜您獲勝！" : "⚫ 黑棋獲勝！";
+            else                                     msg = _aiMode ? "電腦獲勝！再接再厲！" : "⚪ 白棋獲勝！";
 
             string time = string.Format("{0:D2}:{1:D2}", _elapsed / 60, _elapsed % 60);
             DialogResult ans = MessageBox.Show(
@@ -700,16 +689,14 @@ namespace Gomoku
 
         private void RefreshBoard()
         {
-            _lblMoves.Text = "第 " + _game.MoveCount + " 手";
             _board.Invalidate();
             RefreshStatus();
         }
 
         private void RefreshStatus()
         {
-            // 卡片高亮（藍色=當前回合，暗色=等待）
-            Color activeCard   = Color.FromArgb(36, 68, 110);
-            Color inactiveCard = Color.FromArgb(44, 44, 58);
+            Color activeCard   = Color.FromArgb(36, 68, 110);   // 藍色高亮
+            Color inactiveCard = Color.FromArgb(44, 44, 58);    // 暗色待機
 
             if (_game.IsGameOver)
             {
@@ -717,17 +704,17 @@ namespace Gomoku
                 _rightCard.BackColor = inactiveCard;
 
                 if (_game.Winner == Player.None)
-                { _lblStatus.Text = "平局！🤝"; _lblStatus.ForeColor = Color.FromArgb(220, 200, 80); }
+                { _lblStatus.Text = "平局！"; _lblStatus.ForeColor = Color.FromArgb(220, 200, 80); }
                 else if (_game.Winner == Player.Black)
-                { _lblStatus.Text = "⚫ 黑棋獲勝！🏆"; _lblStatus.ForeColor = Color.FromArgb(100, 220, 100); }
+                { _lblStatus.Text = "黑棋獲勝！"; _lblStatus.ForeColor = Color.FromArgb(100, 220, 100); }
                 else
-                { _lblStatus.Text = "⚪ 白棋獲勝！🏆"; _lblStatus.ForeColor = Color.FromArgb(100, 220, 100); }
+                { _lblStatus.Text = "白棋獲勝！"; _lblStatus.ForeColor = Color.FromArgb(100, 220, 100); }
             }
             else if (_aiThinking)
             {
                 _leftCard.BackColor  = inactiveCard;
                 _rightCard.BackColor = activeCard;
-                _lblStatus.Text      = "AI 思考中…";
+                _lblStatus.Text      = "電腦思考中…";
                 _lblStatus.ForeColor = Color.FromArgb(255, 180, 60);
             }
             else
@@ -738,23 +725,19 @@ namespace Gomoku
                 _lblStatus.Text      = blackTurn ? "您的回合" : "電腦回合";
                 _lblStatus.ForeColor = Color.FromArgb(120, 200, 120);
             }
+
+            // 卡片背景變化後需重繪（Paint 事件會重新畫棋子在新背景上）
+            _leftCard.Invalidate();
+            _rightCard.Invalidate();
         }
 
         private void RefreshTimer()
         {
             _lblTimer.Text = string.Format("{0:D2}:{1:D2}", _elapsed / 60, _elapsed % 60);
         }
-
-        private static Color Lighten(Color c, int d)
-        {
-            return Color.FromArgb(
-                Math.Min(255, c.R + d),
-                Math.Min(255, c.G + d),
-                Math.Min(255, c.B + d));
-        }
     }
 
-    // ── 雙緩衝面板（消除棋盤閃爍）────────────────────────────────────
+    // ── 雙緩衝面板 ──────────────────────────────────────────────────
     public sealed class DoubleBufferedPanel : Panel
     {
         public DoubleBufferedPanel()
