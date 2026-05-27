@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="GomokuAI.cs" />
     <Compile Include="GomokuGame.cs" />
+    <Compile Include="ImageResources.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -73,6 +74,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

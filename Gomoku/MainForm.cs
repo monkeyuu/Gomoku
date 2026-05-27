@@ -33,14 +33,24 @@ namespace Gomoku
         // ── 主題 ─────────────────────────────────────────────────────
         private bool _isDark = true;
 
-        // ── 難度顏色 ─────────────────────────────────────────────────
-        private static readonly Color[] DiffColors =
+        // ── 難度顏色（深色主題：飽和鮮豔；亮色主題：降飽和度、柔和高級）────────
+        private static readonly Color[] _diffDark =
         {
-            Color.FromArgb(46, 125, 50),
-            Color.FromArgb(21, 101, 192),
-            Color.FromArgb(204, 101,   0),
-            Color.FromArgb(136,  14,  79)
+            Color.FromArgb( 46, 125,  50),   // 翠綠
+            Color.FromArgb( 21, 101, 192),   // 寶藍
+            Color.FromArgb(204, 101,   0),   // 橘橙
+            Color.FromArgb(136,  14,  79)    // 深莓紫
         };
+        private static readonly Color[] _diffLight =
+        {
+            Color.FromArgb( 96, 148,  86),   // 鼠尾草綠（降飽和）
+            Color.FromArgb( 70, 116, 168),   // 霧霾藍（降飽和）
+            Color.FromArgb(185, 118,  64),   // 赭石橙（降飽和）
+            Color.FromArgb(140,  80, 120)    // 煙燻莓紫（降飽和）
+        };
+        // 根據目前主題回傳對應的難度顏色陣列
+        private Color[] DiffColors => _isDark ? _diffDark : _diffLight;
+
         private static readonly string[] DiffLabels = { "簡單", "中等", "困難", "大師" };
         private readonly RoundedButton[] _diffBtns = new RoundedButton[4];
 
@@ -54,8 +64,8 @@ namespace Gomoku
         private Label  _lblVolPct, _lblDiffTitle;
 
         // ── 設定面板控制項 ────────────────────────────────────────────
-        private TrackBar       _trackVol;
         private RoundedButton  _btnLightTheme, _btnDarkTheme;
+        private RoundedButton  _btnVolMinus, _btnVolPlus;   // 音量 −/+ 按鈕（需存 field 以便主題更新）
         private Label          _lblSettingsTitle;
         private Label          _lblVolTitle, _lblThemeTitle;
         private Panel          _settingsSep1, _settingsSep2;
@@ -260,38 +270,33 @@ namespace Gomoku
 
             // 左卡（黑棋）—— 後加，z-order 在上
             _leftCard = MakeCard(top, 12, cardY, CardW, CardH, ThemeCardAct());
-            MakeLbl(_leftCard, "♟",
-                new Font("Segoe UI Symbol", 18), Color.FromArgb(130,200,130),
-                new Point(4, 3), new Size(32, 52));
             MakeLbl(_leftCard, "玩家",
                 new Font("Microsoft JhengHei", 11, FontStyle.Bold), ThemeText(),
-                new Point(40, 5), new Size(114, 22));
+                new Point(14, 6), new Size(134, 24));
             MakeLbl(_leftCard, "黑棋",
-                new Font("Microsoft JhengHei", 7.5f), ThemeSubText(),
-                new Point(68, 33), new Size(40, 18));
+                new Font("Microsoft JhengHei", 8f), ThemeSubText(),
+                new Point(40, 36), new Size(80, 18));
             _leftCard.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                DrawPieceSmall(e.Graphics, 51, 41, Player.Black, 11);
+                DrawPieceSmall(e.Graphics, 140, 45, Player.Black, 10);
             };
 
             // 右卡（白棋）
             _rightCard = MakeCard(top, FormW - 12 - CardW, cardY, CardW, CardH, ThemeCard());
-            // 機器人圖示改用 GDI+ 繪製（避免 emoji 方框問題）
             _lblWName = new Label();
-            _lblWName.Text      = _aiMode ? "電腦" : "玩家 2";
+            _lblWName.Text      = _aiMode ? "電腦" : "玩家";
             _lblWName.Font      = new Font("Microsoft JhengHei", 11, FontStyle.Bold);
             _lblWName.ForeColor = ThemeText();
-            _lblWName.Location  = new Point(8, 5);
-            _lblWName.Size      = new Size(114, 22);
+            _lblWName.Location  = new Point(60, 6);
+            _lblWName.Size      = new Size(134, 24);
             _lblWName.AutoSize  = false;
             _rightCard.Controls.Add(_lblWName);
             MakeLbl(_rightCard, "白棋",
-                new Font("Microsoft JhengHei", 7.5f), ThemeSubText(),
-                new Point(36, 33), new Size(40, 18));
+                new Font("Microsoft JhengHei", 8f), ThemeSubText(),
+                new Point(40, 36), new Size(80, 18));
             _rightCard.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                DrawPieceSmall(e.Graphics, 22, 41, Player.White, 11);
-                DrawRobotIcon(e.Graphics, CardW - 38, 3, Color.FromArgb(120, 165, 225));
+                DrawPieceSmall(e.Graphics, 140, 45, Player.White, 10);
             };
         }
 
@@ -338,9 +343,14 @@ namespace Gomoku
             int ax = (FormW - 3 * aW - 2 * aGap) / 2;
             const int ay = 60;
 
-            MakeRoundBtn(bot, "↺  新遊戲  (N)",  Color.FromArgb(22,128,52),  ax,             ay, aW, aH, 10, (s,e) => NewGame());
-            MakeRoundBtn(bot, "↩  悔棋      (U)", Color.FromArgb(128,88,18),  ax+aW+aGap,    ay, aW, aH, 10, (s,e) => UndoMove());
-            MakeRoundBtn(bot, "⇄  切換對戰模式", Color.FromArgb(64,64,155),  ax+2*(aW+aGap), ay, aW, aH, 10, (s,e) => ToggleMode());
+            // 操作按鈕顏色：深色主題用飽和色，亮色主題用柔和降飽和色
+            Color cNew  = _isDark ? Color.FromArgb( 22, 128,  52) : Color.FromArgb( 86, 145,  78);  // 綠/鼠尾草
+            Color cUndo = _isDark ? Color.FromArgb(128,  88,  18) : Color.FromArgb(152, 112,  66);  // 棕/溫暖赭石
+            Color cMode = _isDark ? Color.FromArgb( 64,  64, 155) : Color.FromArgb( 88,  96, 158);  // 靛/柔和靛藍
+
+            MakeRoundBtn(bot, "↺  新遊戲  (N)",  cNew,  ax,             ay, aW, aH, 10, (s,e) => NewGame());
+            MakeRoundBtn(bot, "↩  悔棋      (U)", cUndo, ax+aW+aGap,    ay, aW, aH, 10, (s,e) => UndoMove());
+            MakeRoundBtn(bot, "⇄  切換對戰模式", cMode, ax+2*(aW+aGap), ay, aW, aH, 10, (s,e) => ToggleMode());
 
             // ── 齒輪設定按鈕（右下角圓形）─────────────────────────
             RoundedButton gear = new RoundedButton();
@@ -366,7 +376,8 @@ namespace Gomoku
 
         private void BuildSettingsPanel()
         {
-            const int sw = 222, sh = 170;   // 加高，讓底部有足夠空間
+            // 移除 TrackBar（會視覺溢出蓋住下方文字）→ 改用 −/+ 按鈕
+            const int sw = 222, sh = 150;
             int sx = FormW - sw - 12;
             int sy = TopH + BoardSz - sh - 6;
 
@@ -376,7 +387,6 @@ namespace Gomoku
             _settingsPanel.Visible  = false;
             _settingsPanel.Paint   += SettingsPanel_Paint;
 
-            // 圓角 Region
             using (GraphicsPath gp = RoundedPath(new Rectangle(0, 0, sw, sh), 12))
                 _settingsPanel.Region = new System.Drawing.Region(gp);
 
@@ -389,7 +399,6 @@ namespace Gomoku
             _lblSettingsTitle.AutoSize  = false;
             _settingsPanel.Controls.Add(_lblSettingsTitle);
 
-            // 關閉按鈕
             RoundedButton btnClose = new RoundedButton();
             btnClose.Text      = "✕";
             btnClose.Font      = new Font("Microsoft JhengHei", 9, FontStyle.Bold);
@@ -401,53 +410,73 @@ namespace Gomoku
             btnClose.Click    += (s, e) => _settingsPanel.Visible = false;
             _settingsPanel.Controls.Add(btnClose);
 
-            // ─ 分隔線 ─────────────────────────────────────────────
             _settingsSep1 = new Panel { Location = new Point(8, 33), Size = new Size(sw - 16, 1) };
             _settingsPanel.Controls.Add(_settingsSep1);
 
-            // ─ 音量 ───────────────────────────────────────────────
+            // ─ 音量（−/+ 按鈕，不用 TrackBar） ─────────────────────
+            // 佈局：[♪ 音量]x=12  [−]x=108  [50%]x=141  [+]x=182  邊距=10px
             _lblVolTitle = new Label();
-            _lblVolTitle.Text      = "♪  音量";       // ♪ = BMP U+266A，不會顯示方框
+            _lblVolTitle.Text      = "♪  音量";
             _lblVolTitle.Font      = new Font("Microsoft JhengHei", 8.5f);
-            _lblVolTitle.Location  = new Point(12, 38);
-            _lblVolTitle.Size      = new Size(100, 16);
+            _lblVolTitle.Location  = new Point(12, 41);
+            _lblVolTitle.Size      = new Size(62, 20);
+            _lblVolTitle.TextAlign = ContentAlignment.MiddleLeft;
             _lblVolTitle.AutoSize  = false;
             _settingsPanel.Controls.Add(_lblVolTitle);
 
+            // [−] 按鈕：x=108，寬 30，到 138
+            _btnVolMinus = new RoundedButton();
+            _btnVolMinus.Text     = "−";
+            _btnVolMinus.Font     = new Font("Segoe UI", 13, FontStyle.Bold);
+            _btnVolMinus.Location = new Point(108, 37);
+            _btnVolMinus.Size     = new Size(30, 28);
+            _btnVolMinus.Radius   = 7;
+            _btnVolMinus.Cursor   = Cursors.Hand;
+            _btnVolMinus.Click   += (s, e) =>
+            {
+                int v = Math.Max(0, MusicPlayer.Volume - 10);
+                MusicPlayer.SetVolume(v);
+                _lblVolPct.Text = v + "%";
+            };
+            _settingsPanel.Controls.Add(_btnVolMinus);
+
+            // 音量百分比顯示：x=141，寬 38，到 179（與 [−][+] 不重疊）
             _lblVolPct = new Label();
             _lblVolPct.Text      = MusicPlayer.Volume + "%";
-            _lblVolPct.Font      = new Font("Consolas", 8.5f, FontStyle.Bold);
-            _lblVolPct.Location  = new Point(sw - 44, 38);
-            _lblVolPct.Size      = new Size(36, 16);
-            _lblVolPct.TextAlign = ContentAlignment.MiddleRight;
+            _lblVolPct.Font      = new Font("Consolas", 9f, FontStyle.Bold);
+            _lblVolPct.Location  = new Point(141, 41);
+            _lblVolPct.Size      = new Size(38, 20);
+            _lblVolPct.TextAlign = ContentAlignment.MiddleCenter;
             _lblVolPct.AutoSize  = false;
             _settingsPanel.Controls.Add(_lblVolPct);
 
-            _trackVol = new TrackBar();
-            _trackVol.Minimum       = 0;
-            _trackVol.Maximum       = 100;
-            _trackVol.Value         = MusicPlayer.Volume;
-            _trackVol.TickFrequency = 10;
-            _trackVol.TickStyle     = TickStyle.None;   // 移除刻度，防止視覺溢出覆蓋下方文字
-            _trackVol.Location      = new Point(6, 55);
-            _trackVol.Size          = new Size(sw - 12, 26);
-            _trackVol.Scroll       += (s, e) =>
+            // [+] 按鈕：x=182，寬 30，到 212（距面板右邊 10px，絕對不被截斷）
+            _btnVolPlus = new RoundedButton();
+            _btnVolPlus.Text     = "+";
+            _btnVolPlus.Font     = new Font("Segoe UI", 13, FontStyle.Bold);
+            _btnVolPlus.Location = new Point(182, 37);
+            _btnVolPlus.Size     = new Size(30, 28);
+            _btnVolPlus.Radius   = 7;
+            _btnVolPlus.Cursor   = Cursors.Hand;
+            _btnVolPlus.Click   += (s, e) =>
             {
-                _lblVolPct.Text = _trackVol.Value + "%";
-                MusicPlayer.SetVolume(_trackVol.Value);
+                int v = Math.Min(100, MusicPlayer.Volume + 10);
+                MusicPlayer.SetVolume(v);
+                _lblVolPct.Text = v + "%";
             };
-            _settingsPanel.Controls.Add(_trackVol);
+            _settingsPanel.Controls.Add(_btnVolPlus);
 
             // ─ 分隔線 ─────────────────────────────────────────────
-            _settingsSep2 = new Panel { Location = new Point(8, 88), Size = new Size(sw - 16, 1) };
+            _settingsSep2 = new Panel { Location = new Point(8, 70), Size = new Size(sw - 16, 1) };
             _settingsPanel.Controls.Add(_settingsSep2);
 
+            // ─ 主題（先加按鈕，最後加 Label 保持最高 z-order） ──────
             const int tbW = 95, tbH = 33;
 
             _btnLightTheme = new RoundedButton();
             _btnLightTheme.Text     = "◯  亮色";
             _btnLightTheme.Font     = new Font("Microsoft JhengHei", 9, FontStyle.Bold);
-            _btnLightTheme.Location = new Point(8, 120);
+            _btnLightTheme.Location = new Point(8, 103);
             _btnLightTheme.Size     = new Size(tbW, tbH);
             _btnLightTheme.Radius   = 8;
             _btnLightTheme.Cursor   = Cursors.Hand;
@@ -457,23 +486,24 @@ namespace Gomoku
             _btnDarkTheme = new RoundedButton();
             _btnDarkTheme.Text     = "◉  暗色";
             _btnDarkTheme.Font     = new Font("Microsoft JhengHei", 9, FontStyle.Bold);
-            _btnDarkTheme.Location = new Point(sw - tbW - 8, 120);
+            _btnDarkTheme.Location = new Point(sw - tbW - 8, 103);
             _btnDarkTheme.Size     = new Size(tbW, tbH);
             _btnDarkTheme.Radius   = 8;
             _btnDarkTheme.Cursor   = Cursors.Hand;
             _btnDarkTheme.Click   += (s, e) => { _isDark = true; ApplyTheme(); };
             _settingsPanel.Controls.Add(_btnDarkTheme);
 
-            // ─ 主題 Label 最後加入（z-order 最高，不會被其他控制項蓋住）─
-            // AutoSize=true 讓標籤自動計算寬度，不被截斷
+            // 主題 Label：最後加入（最高 z-order），no-TrackBar 後的全新佈局下不再被覆蓋
             _lblThemeTitle = new Label();
             _lblThemeTitle.Text      = "◈  主題";
             _lblThemeTitle.Font      = new Font("Microsoft JhengHei", 8.5f);
             _lblThemeTitle.ForeColor = ThemeSubText();
-            _lblThemeTitle.BackColor = ThemeSettings();   // 明確設定，避免透明問題
-            _lblThemeTitle.AutoSize  = true;              // 自動決定寬高，不截斷
-            _lblThemeTitle.Location  = new Point(12, 96);
-            _settingsPanel.Controls.Add(_lblThemeTitle);  // 最後加入 = 最高 z-order
+            _lblThemeTitle.BackColor = ThemeSettings();
+            _lblThemeTitle.AutoSize  = false;
+            _lblThemeTitle.Size      = new Size(sw - 20, 24);
+            _lblThemeTitle.Location  = new Point(10, 75);
+            _lblThemeTitle.TextAlign = ContentAlignment.MiddleLeft;
+            _settingsPanel.Controls.Add(_lblThemeTitle);
 
             Controls.Add(_settingsPanel);
             UpdateSettingsPanelTheme();
@@ -500,7 +530,7 @@ namespace Gomoku
             Color sepCol  = ThemeSettingsSep();
 
             _settingsPanel.BackColor = panelBg;
-            _trackVol.BackColor      = panelBg;
+            // TrackBar 已移除，此處不再設定 BackColor
 
             if (_lblSettingsTitle != null) { _lblSettingsTitle.BackColor = panelBg; _lblSettingsTitle.ForeColor = textCol; }
             if (_lblVolTitle   != null) { _lblVolTitle.BackColor   = panelBg; _lblVolTitle.ForeColor   = subCol; }
@@ -508,6 +538,12 @@ namespace Gomoku
             if (_lblThemeTitle != null) { _lblThemeTitle.BackColor = panelBg; _lblThemeTitle.ForeColor = subCol; }
             if (_settingsSep1  != null) _settingsSep1.BackColor = sepCol;
             if (_settingsSep2  != null) _settingsSep2.BackColor = sepCol;
+
+            // −/+ 按鈕：明確設定顏色，深/亮主題都清晰可見
+            Color volBtnBg = _isDark ? Color.FromArgb(50, 50, 70) : Color.FromArgb(185, 178, 164);
+            Color volBtnFg = _isDark ? Color.FromArgb(215, 210, 230) : Color.FromArgb(45, 42, 35);
+            if (_btnVolMinus != null) { _btnVolMinus.BackColor = volBtnBg; _btnVolMinus.ForeColor = volBtnFg; _btnVolMinus.Invalidate(); }
+            if (_btnVolPlus  != null) { _btnVolPlus.BackColor  = volBtnBg; _btnVolPlus.ForeColor  = volBtnFg; _btnVolPlus.Invalidate(); }
 
             // 主題按鈕：選中=藍，未選中=中性
             Color selColor = Color.FromArgb(0, 115, 200);
@@ -589,11 +625,21 @@ namespace Gomoku
             for (int i = 0; i < 4; i++)
             {
                 if (_diffBtns[i] == null) continue;
-                bool on = (i == sel);
+                bool on = _aiMode && (i == sel);   // 雙人模式不顯示選中顏色
+
+                // 人機模式：正常顏色；雙人模式：停用並變灰
+                _diffBtns[i].Enabled   = _aiMode;
+                _diffBtns[i].Cursor    = _aiMode ? Cursors.Hand : Cursors.Default;
                 _diffBtns[i].BackColor = on ? DiffColors[i] : ThemeDiffUnsel();
                 _diffBtns[i].ForeColor = on ? Color.White   : ThemeSubText();
                 _diffBtns[i].Invalidate();
             }
+
+            // 難度標題：雙人模式時變灰提示不可用
+            if (_lblDiffTitle != null)
+                _lblDiffTitle.ForeColor = _aiMode
+                    ? ThemeSubText()
+                    : Color.FromArgb(_isDark ? 52 : 165, _isDark ? 50 : 158, _isDark ? 65 : 148);
         }
 
         private static Color Lighten(Color c, int d) =>
@@ -757,6 +803,23 @@ namespace Gomoku
         /// 在頂部右卡 Paint 事件中繪製機器人圖示（GDI+，不依賴 emoji 字型）。
         /// x, y = 圖示區域左上角（於卡片座標系內）。
         /// </summary>
+        private static void DrawCardIcon(Graphics g, int x, int y, string base64, int maxSize = 26)
+        {
+            try
+            {
+                byte[] bytes = Convert.FromBase64String(base64);
+                using (var ms = new System.IO.MemoryStream(bytes))
+                using (var bmp = new Bitmap(ms))
+                {
+                    float scale = Math.Min((float)maxSize / bmp.Width, (float)maxSize / bmp.Height);
+                    int dw = (int)(bmp.Width * scale);
+                    int dh = (int)(bmp.Height * scale);
+                    g.DrawImage(bmp, x, y, dw, dh);
+                }
+            }
+            catch { }
+        }
+
         private static void DrawRobotIcon(Graphics g, int x, int y, Color col)
         {
             // 繪製範圍約 30×48 px
@@ -785,6 +848,27 @@ namespace Gomoku
                 // 手臂
                 g.DrawLine(pen, x + 2,  y + 34, x + 6,  y + 34);
                 g.DrawLine(pen, x + 24, y + 34, x + 28, y + 34);
+            }
+        }
+
+        private static void DrawPersonIcon(Graphics g, int x, int y, Color col)
+        {
+            // 繪製範圍約 30×48 px，和 DrawRobotIcon 相同大小
+            using (Pen pen = new Pen(col, 1.8f))
+            using (SolidBrush brush = new SolidBrush(col))
+            {
+                // 頭（圓形）
+                g.DrawEllipse(pen, x + 7, y + 2, 16, 16);
+
+                // 身體（梯形輪廓：肩膀→腰）
+                g.DrawLine(pen, x + 4,  y + 42, x + 8,  y + 20);   // 左側
+                g.DrawLine(pen, x + 26, y + 42, x + 22, y + 20);   // 右側
+                g.DrawLine(pen, x + 8,  y + 20, x + 22, y + 20);   // 肩膀
+                g.DrawLine(pen, x + 4,  y + 42, x + 26, y + 42);   // 下擺
+
+                // 手臂
+                g.DrawLine(pen, x + 8,  y + 22, x + 1,  y + 34);   // 左臂
+                g.DrawLine(pen, x + 22, y + 22, x + 29, y + 34);   // 右臂
             }
         }
 
@@ -896,6 +980,7 @@ namespace Gomoku
             // 重建頂部面板以更新電腦/玩家2名稱
             _topPanel.Controls.Clear();
             BuildTopPanel(_topPanel);
+            UpdateDiffBtns();   // 切換難度按鈕啟用狀態（雙人模式 = 停用）
             NewGame();
         }
 
@@ -1041,22 +1126,39 @@ namespace Gomoku
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            // hover 時略亮
-            Color bg = _hovered
+            // hover 時略亮（停用時不回應 hover）
+            Color bg = (_hovered && Enabled)
                 ? Color.FromArgb(Math.Min(255,BackColor.R+22),
                                  Math.Min(255,BackColor.G+22),
                                  Math.Min(255,BackColor.B+22))
                 : BackColor;
 
-            // Region 已裁剪圓角，直接填矩形即可
             using (SolidBrush brush = new SolidBrush(bg))
                 g.FillRectangle(brush, ClientRectangle);
 
-            TextRenderer.DrawText(g, Text, Font, ClientRectangle, ForeColor,
+            // 停用狀態：依背景亮度自動選遮罩
+            // 亮色按鈕（亮色主題）→ 白色霧化；暗色按鈕（暗色主題）→ 深色變暗
+            if (!Enabled)
+            {
+                float lum = (BackColor.R * 0.299f + BackColor.G * 0.587f + BackColor.B * 0.114f) / 255f;
+                Color maskCol = lum > 0.45f
+                    ? Color.FromArgb(95, 255, 255, 255)  // 亮色主題：白色半透明霧化
+                    : Color.FromArgb(115, 6, 6, 10);     // 暗色主題：深色遮罩
+                using (SolidBrush mask = new SolidBrush(maskCol))
+                    g.FillRectangle(mask, ClientRectangle);
+            }
+
+            // 停用時文字也配合主題變灰
+            Color fg = Enabled ? ForeColor
+                : (((BackColor.R * 0.299f + BackColor.G * 0.587f + BackColor.B * 0.114f) / 255f) > 0.45f
+                    ? Color.FromArgb(158, 148, 130)   // 亮色主題：溫暖中灰
+                    : Color.FromArgb(62, 60, 75));    // 暗色主題：深藍灰
+
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, fg,
                 TextFormatFlags.HorizontalCenter |
                 TextFormatFlags.VerticalCenter   |
                 TextFormatFlags.SingleLine       |
-                TextFormatFlags.NoPadding);   // 移除 GDI 文字內距，讓圖示在圓形正中央
+                TextFormatFlags.NoPadding);
         }
     }
 }
